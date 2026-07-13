@@ -45,7 +45,7 @@ class WaveshareCan:
 
     def __init__(self, port: str, can_speed: CanSpeed = CanSpeed.SPEED_250kbps, baudrate: int = 2000000) -> None:
         """
-        Initialize a Waveshare USB CAN A
+        Initialize a Waveshare USB CAN A with the serial port already open ready.
 
         Args:
             port: the serial port to connect to
@@ -57,3 +57,34 @@ class WaveshareCan:
         self.baudrate = baudrate
         self.mode = CanMode.NORMAL
         self.send_type = CanFrameFormat.STANDARD
+        self.serial = serial.Serial(self.port, self.baudrate)
+        self.open = True
+        return
+
+    def open_port(self) -> None:
+        try:
+            if not self.open:
+                self.serial.open()
+                self.open = True
+                print("Port opened")
+            else:
+                print("Port already open")
+        except serial.SerialException as e:
+            print('Could not open serial port')
+            print(e)
+        return
+
+    def close_port(self) -> None:
+        if self.open:
+            self.serial.close()
+            self.open = False
+            print("Port closed")
+        else:
+            print("Port not open")
+        return
+
+if __name__ == '__main__':
+    device = WaveshareCan('COM6')
+    device.open_port()
+    device.close_port()
+    device.open_port()
