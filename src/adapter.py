@@ -123,27 +123,33 @@ class WaveshareCan:
             raise ReadException('Port not open')
 
         try:
-            data = self.serial.read(2)
-            if (data[0] == 0xaa) and (data[1] & 0xC0 == 0xC0):
-                # get frame configurations
-                data_length = data[1] & 0xF
-                is_rtr = data[1] & 0x10
-                is_extended = data[1] & 0x20
-                frame_length = data_length + (5 if is_extended else 3) # includes the footer (55)
+            """
+            This loops until it finds the header byte plus a byte with the first two bits being 1 (C0).
+            It will then raise a ReadException if the end byte is not footer (55).
+            There can be a rare case where data is aligned so perfectly that there is a AA C0 ... 55 marking a packet when
+            there is not one. The library might read this ghost packet accidentally in an extreme edge case and nothing
+            can be done to stop this unfortunately
+            """
+            while True:
+                header = self.serial.read(1)[0]
+                if header == 0xAA:
+                    control = self.serial.read(1)[0]
+                    if control & 0xC0 == 0xC0:
+                        # get frame configurations
+                        data_length = control & 0xF
+                        is_rtr = control & 0x10
+                        is_extended = control & 0x20
+                        frame_length = data_length + (5 if is_extended else 3)  # includes the footer (55)
 
-                # Get the rest of the data
-                payload = self.serial.read(frame_length)
-                if payload[-1] != 0x55:
-                    raise ReadException('Data not received correctly')
+                        # Get the rest of the data
+                        payload = self.serial.read(frame_length)
+                        if payload[-1] != 0x55:
+                            raise ReadException('Data not received correctly')
 
-                frame_id = int.from_bytes(payload[0:(4 if is_extended else 2)], byteorder='little')
-                payload_data = payload[4 if is_extended else 2:-1]
+                        frame_id = int.from_bytes(payload[0:(4 if is_extended else 2)], byteorder='little')
+                        payload_data = payload[4 if is_extended else 2:-1]
 
-                return CANFrame(frame_id, payload_data, bool(is_extended), bool(is_rtr))
-
-            else:
-                raise ReadException('Start of frame received incorrectly')
-
+                        return CANFrame(frame_id, payload_data, bool(is_extended), bool(is_rtr))
 
         except serial.SerialException as e:
             raise ReadException(f'Could not read data: {e}')
