@@ -68,7 +68,6 @@ class WaveshareCan:
         self.port = port
         self.baudrate = baudrate
         self.serial = serial.Serial(self.port, self.baudrate)
-        self.open = True
 
         # data for CAN bus configurations
         self.can_speed = can_speed
@@ -84,9 +83,8 @@ class WaveshareCan:
     def open_port(self) -> None:
         """Opens the serial port if closed"""
         try:
-            if not self.open:
+            if not self.serial.is_open:
                 self.serial.open()
-                self.open = True
                 print("Port opened")
             else:
                 print("Port already open")
@@ -97,9 +95,8 @@ class WaveshareCan:
 
     def close_port(self) -> None:
         """Closes the serial port if open"""
-        if self.open:
+        if self.serial.is_open:
             self.serial.close()
-            self.open = False
             print("Port closed")
         else:
             print("Port not open")
@@ -107,7 +104,7 @@ class WaveshareCan:
 
     def _write(self, data: bytes) -> None:
         """Writes the bytes to the serial port"""
-        if not self.open:
+        if not self.serial.is_open:
             raise WriteException('Port not open')
 
         try:
@@ -120,7 +117,7 @@ class WaveshareCan:
     def read_frame(self) -> CANFrame:
         """Reads the incoming frame from the serial port
         :return: the incoming frame as a CANFrame object"""
-        if not self.open:
+        if not self.serial.is_open:
             raise ReadException('Port not open')
 
         try:
