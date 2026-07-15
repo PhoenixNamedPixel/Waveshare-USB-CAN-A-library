@@ -37,7 +37,10 @@ class CANFrame:
         if len(can_data) > MAX_DATA_LENGTH:
             raise ValueError(f"CAN frame data cannot exceed {MAX_DATA_LENGTH} bytes, provided payload was {len(can_data)} bytes")
         self._can_data = can_data
-        self.dlc = len(can_data)
+
+    @property
+    def dlc(self) -> int:
+        return len(self._can_data)
 
     @property
     def is_extended(self) -> bool:
