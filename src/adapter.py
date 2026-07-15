@@ -1,4 +1,6 @@
 from enum import Enum
+from typing import Optional
+
 from CANFrame import CANFrame
 
 import serial
@@ -60,8 +62,8 @@ class WaveshareCan:
 
         Args:
             port: the serial port to connect to
-            can_speed: the speed of the can bus, default is 250 kbps
-            baudrate: the baudrate of the serial port, default is 2000000
+            can_speed: the speed of the can bus
+            baudrate: the baudrate of the serial port
             """
 
         # data for serial port
@@ -70,8 +72,8 @@ class WaveshareCan:
         self.serial = serial.Serial(self.port, self.baudrate)
 
         # data for CAN bus configurations
+        self.type = Type.VARIABLE
         self.can_speed = can_speed
-        self.type= Type.VARIABLE
         self.send_type = CanFrameFormat.STANDARD
         self.mode = CanMode.NORMAL
         self.auto_retransmit = AutoRetransmit.ENABLED
@@ -185,6 +187,34 @@ class WaveshareCan:
         payload += frame.can_data
         payload += bytes([0x55])
         self._write(payload)
+
+    def update_configurations(self, communication_type: Optional[Type] = None, can_speed: Optional[CanSpeed] = None, frame_type: Optional[CanFrameFormat] = None, can_mode: Optional[CanMode] = None, auto_retransmit: Optional[AutoRetransmit] = None) -> None:
+        """Updates the configurations sent to the Waveshare adapter, add only the settings you want to change, the others will remain the same.
+        Args:
+            communication_type: The communication type of the configurations sent to the Waveshare adapter, either fixed or variable data length. Use the Type class.
+            can_speed: The speed of the can bus. Use the CanSpeed class.
+            frame_type: Which type of frame to use, standard to extended. Use the CanFrameFormat class.
+            can_mode: The communication mode of the adapter, normal, silent, loopback, and loopback silent. Use the CanMode class.
+            auto_retransmit: Automatically retransmit the can frame if failed. Use the AutoRetransmit class."""
+        is_changed = False
+        if communication_type is not None:
+            self.type = communication_type
+            is_changed = True
+        if can_speed is not None:
+            self.can_speed = can_speed
+            is_changed = True
+        if frame_type is not None:
+            self.send_type = frame_type
+            is_changed = True
+        if can_mode is not None:
+            self.mode = can_mode
+            is_changed = True
+        if auto_retransmit is not None:
+            self.auto_retransmit = auto_retransmit
+            is_changed = True
+        if is_changed:
+            self.send_configurations()
+
 
 if __name__ == '__main__':
     device = WaveshareCan('COM6')
