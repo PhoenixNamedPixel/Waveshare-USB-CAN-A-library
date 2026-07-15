@@ -173,6 +173,19 @@ class WaveshareCan:
         configurations += bytes([calculate_checksum(configurations)])
         self._write(configurations)
 
+    def send_frame(self, frame: CANFrame) -> None:
+        """Prepares and sends a frame to the Waveshare adapter
+        Args:
+            frame: The CANFrame object to be sent to the Waveshare adapter"""
+        payload = bytes([
+            0xAA,
+            0xC0 | (0x20 if frame.is_extended else 0x00) | (0x10 if frame.is_rtr else 0x00) | frame.dlc,
+            ])
+        payload += frame.can_id.to_bytes(4 if frame.is_extended else 2, byteorder='little')
+        payload += frame.can_data
+        payload += bytes([0x55])
+        self._write(payload)
+
 if __name__ == '__main__':
     device = WaveshareCan('COM6')
     device.open_port()
