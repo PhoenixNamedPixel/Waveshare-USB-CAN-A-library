@@ -38,3 +38,6 @@ class CANFrame:
             raise ValueError(f"CAN frame data cannot exceed {MAX_DATA_LENGTH} bytes, provided payload was {len(can_data)} bytes")
         self._can_data = can_data
         self.dlc = len(can_data)
+
+    def __repr__(self) -> str:
+        return f"CANFrame(can_id={self.can_id}, can_data={self.can_data}, is_extended={self.is_extended}, is_rtr={self.is_rtr})"
