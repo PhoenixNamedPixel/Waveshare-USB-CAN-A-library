@@ -12,9 +12,9 @@ class CANFrame:
         Args:
             can_id (int): CAN frame id
             can_data (bytes, optional): CAN frame data. Defaults to empty bytes.
-            is_extended (bool, optional): Whether the CAN frame is extended. Defaults to False.
+            is_extended (bool, optional): Whether the CAN frame is extended. Defaults to False. **This is unchangable after frame creation.**
             is_rtr (bool, optional): Whether the CAN frame is a remote transmition request. Defaults to False."""
-        self.is_extended = is_extended
+        self._is_extended = is_extended
         self.is_rtr = is_rtr
         self.can_id = can_id
         self.can_data = can_data
@@ -26,7 +26,7 @@ class CANFrame:
 
     @can_id.setter
     def can_id(self, can_id: int) -> None:
-        self._can_id = can_id & (EXTENDED_MASK if self.is_extended else STANDARD_MASK)
+        self._can_id = can_id & (EXTENDED_MASK if self._is_extended else STANDARD_MASK)
 
     @property
     def can_data(self) -> bytes:
@@ -40,4 +40,4 @@ class CANFrame:
         self.dlc = len(can_data)
 
     def __repr__(self) -> str:
-        return f"CANFrame(can_id={self.can_id}, can_data={self.can_data}, is_extended={self.is_extended}, is_rtr={self.is_rtr})"
+        return f"CANFrame(can_id={self.can_id}, can_data={self.can_data}, is_extended={self._is_extended}, is_rtr={self.is_rtr})"
