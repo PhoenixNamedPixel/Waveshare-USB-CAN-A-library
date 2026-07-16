@@ -42,34 +42,34 @@ class AutoRetransmit(Enum):
     ENABLED = 0x00
     DISABLED = 0x01
 
+
 class WriteException(Exception):
     pass
+
 
 class ReadException(Exception):
     pass
 
 
-def calculate_checksum(data: bytes) -> int:
-    return sum(data[2:]) & 0xFF
+class PortException(Exception):
+    pass
 
 
 class WaveshareCan:
     """A class to interact with a Waveshare USB CAN A"""
 
-    def __init__(self, port: str, can_speed: CanSpeed = CanSpeed.SPEED_250kbps, baudrate: int = 2000000) -> None:
+    def __init__(self, port: Optional[str], can_speed: CanSpeed = CanSpeed.SPEED_250kbps, baudrate: int = 2000000) -> None:
         """
-        Initialize a Waveshare USB CAN A with the serial port already open ready.
+        Initialize the Waveshare USB CAN A library
+
+        You have the option of either giving a port, and it will be opened immidately, or omit the port so no connection
+        will be made
 
         Args:
-            port: the serial port to connect to
+            port: the serial port to connect to (If a port is not given, you must use init_port() to initialize it)
             can_speed: the speed of the can bus
             baudrate: the baudrate of the serial port
             """
-
-        # data for serial port
-        self.port = port
-        self.baudrate = baudrate
-        self.serial = serial.Serial(self.port, self.baudrate)
 
         # data for CAN bus configurations
         self.type = Type.VARIABLE
@@ -78,12 +78,25 @@ class WaveshareCan:
         self.mode = CanMode.NORMAL
         self.auto_retransmit = AutoRetransmit.ENABLED
 
-        self.send_configurations()
+        # data for serial port
+        self.baudrate = baudrate
+        self.port = None
+        self.serial = None
+        if port is not None:
+            self.init_port(port)
 
-        return
+    def init_port(self, port: str) -> None:
+        """Initialize and open the serial port if not done on object creation
+        Args:
+            port: the serial port to connect"""
+        self.port = port
+        self.serial = serial.Serial(self.port, self.baudrate)
+        self.send_configurations()
 
     def open_port(self) -> None:
         """Opens the serial port if closed"""
+        if self.serial is None:
+            raise PortException("The port has not been declared")
         try:
             if not self.serial.is_open:
                 self.serial.open()
@@ -93,19 +106,21 @@ class WaveshareCan:
         except serial.SerialException as e:
             print('Could not open serial port')
             print(e)
-        return
 
     def close_port(self) -> None:
         """Closes the serial port if open"""
+        if self.serial is None:
+            raise PortException("The port has not been declared")
         if self.serial.is_open:
             self.serial.close()
             print("Port closed")
         else:
             print("Port not open")
-        return
 
     def _write(self, data: bytes) -> None:
         """Writes the bytes to the serial port"""
+        if self.serial is None:
+            raise PortException("The port has not been declared")
         if not self.serial.is_open:
             raise WriteException('Port not open')
 
@@ -119,6 +134,8 @@ class WaveshareCan:
     def read_frame(self) -> CANFrame:
         """Reads the incoming frame from the serial port
         :return: the incoming frame as a CANFrame object"""
+        if self.serial is None:
+            raise PortException("The port has not been declared")
         if not self.serial.is_open:
             raise ReadException('Port not open')
 
@@ -135,33 +152,59 @@ class WaveshareCan:
                 if header == 0xAA:
                     control = self.serial.read(1)[0]
                     if control & 0xC0 == 0xC0:
-                        # get frame configurations
-                        data_length = control & 0xF
-                        is_rtr = control & 0x10
-                        is_extended = control & 0x20
-                        frame_length = data_length + (5 if is_extended else 3)  # includes the footer (55)
+                        frame_length, is_extended, is_rtr = self._parse_control_byte(control)
 
                         # Get the rest of the data
                         payload = self.serial.read(frame_length)
-                        if payload[-1] != 0x55:
-                            raise ReadException('Data not received correctly')
 
-                        frame_id = int.from_bytes(payload[0:(4 if is_extended else 2)], byteorder='little')
-                        payload_data = payload[4 if is_extended else 2:-1]
+                        # is_extended and is_rtr are needed to work out the exact frame length for reading the payload
+                        return self._parse_frame(payload, is_extended, is_rtr)
 
-                        return CANFrame(frame_id, payload_data, bool(is_extended), bool(is_rtr))
 
         except serial.SerialException as e:
             raise ReadException(f'Could not read data: {e}')
 
+    @staticmethod
+    def _parse_control_byte(control) -> tuple[int, bool, bool]:
+        """Parses the incoming control byte from the serial port"""
+        # get frame configurations
+        data_length = control & 0xF
+        is_rtr = bool(control & 0x10)
+        is_extended = bool(control & 0x20)
+        frame_length = data_length + (5 if is_extended else 3)  # includes the footer (55)
+        return frame_length, is_extended, is_rtr
+
+    @staticmethod
+    def _parse_frame(payload: bytes, is_extended: bool, is_rtr: bool) -> CANFrame:
+        """Parses the incoming frame from the serial port into a CANFrame object
+
+        **Note:** this is automatically used within read_frame
+        Args:
+            payload: The incoming frame from the serial port minus the header and control bits
+            is_extended: if the frame is standard or extended
+            is_rtr: if the frame is a remote transmission request or not"""
+        if payload[-1] != 0x55:
+            raise ReadException('Data not received correctly')
+
+        frame_id = int.from_bytes(payload[0:(4 if is_extended else 2)], byteorder='little')
+        payload_data = payload[4 if is_extended else 2:-1]
+
+        return CANFrame(frame_id, payload_data, bool(is_extended), is_rtr)
+
     def send_configurations(self) -> None:
         """Sends the configurations to the Waveshare adapter"""
+        configurations = self._prepare_config_payload()
+        self._write(configurations)
+
+    def _prepare_config_payload(self) -> bytes:
+        """Prepares the configuration payload for the Waveshare adapter
+        **Note:** this is automatically used within send_configurations"""
         configurations = bytes([
-            0xAA, # Message header
-            0x55, # Message footer
-            self.type.value, # Fixed vs Variable length
-            self.can_speed.value, # Speed of CAN bus
-            self.send_type.value, # Standard vs Extended frame
+            0xAA,  # Message header
+            0x55,  # Message footer
+            self.type.value,  # Fixed vs Variable length
+            self.can_speed.value,  # Speed of CAN bus
+            self.send_type.value,  # Standard vs Extended frame
             0x00,
             0x00,
             0x00,
@@ -178,21 +221,32 @@ class WaveshareCan:
             0x00,
         ])
 
-        configurations += bytes([calculate_checksum(configurations)])
-        self._write(configurations)
+        configurations += bytes([self._calculate_checksum(configurations)])
+        return configurations
 
     def send_frame(self, frame: CANFrame) -> None:
         """Prepares and sends a frame to the Waveshare adapter
         Args:
             frame: The CANFrame object to be sent to the Waveshare adapter"""
+        payload = self._prepare_frame(frame)
+        self._write(payload)
+
+    @staticmethod
+    def _prepare_frame(frame: CANFrame) -> bytes:
+        """Turns the CAN frame from a CANFrame object to the bytes needed to send to the adapter.
+
+        **Note:** this is automatically used within send_frame
+        Args:
+            frame: The CAN frame that needs to be turned into bytes
+        """
         payload = bytes([
             0xAA,
             0xC0 | (0x20 if frame.is_extended else 0x00) | (0x10 if frame.is_rtr else 0x00) | frame.dlc,
-            ])
+        ])
         payload += frame.can_id.to_bytes(4 if frame.is_extended else 2, byteorder='little')
         payload += frame.can_data
         payload += bytes([0x55])
-        self._write(payload)
+        return payload
 
     def update_configurations(self, communication_type: Optional[Type] = None, can_speed: Optional[CanSpeed] = None, frame_type: Optional[CanFrameFormat] = None, can_mode: Optional[CanMode] = None, auto_retransmit: Optional[AutoRetransmit] = None) -> None:
         """Updates the configurations sent to the Waveshare adapter, add only the settings you want to change, the others will remain the same.
@@ -218,12 +272,14 @@ class WaveshareCan:
         if auto_retransmit is not None:
             self.auto_retransmit = auto_retransmit
             is_changed = True
-        if is_changed:
+        if is_changed and self.port is not None:
             self.send_configurations()
 
+    @staticmethod
+    def _calculate_checksum(data: bytes) -> int:
+        return sum(data[2:]) & 0xFF
 
 if __name__ == '__main__':
     device = WaveshareCan('COM6')
-    device.open_port()
-    device.close_port()
-    device.open_port()
+    while True:
+        print(device.read_frame())
