@@ -10,12 +10,14 @@ class CANFrame:
     def __init__(self, can_id: int, can_data: bytes = b"", is_extended: bool = False, is_rtr: bool = False) -> None:
         """Constructs the data needed for a CAN frame
         Args:
-            can_id (int): CAN frame id
+            can_id (int): CAN frame id, up to 2047 when standard and 536,870,911 when extended
             can_data (bytes, optional): CAN frame data. Defaults to empty bytes.
             is_extended (bool, optional): Whether the CAN frame is extended. Defaults to False. **This is unchangable after frame creation.**
             is_rtr (bool, optional): Whether the CAN frame is a remote transmition request. Defaults to False."""
         self._is_extended = is_extended
         self.is_rtr = is_rtr
+        if can_id < 0 or can_id > (536870911 if is_extended else 2047):
+            raise ValueError("CAN id not valid")
         self.can_id = can_id
         self.can_data = can_data
 
