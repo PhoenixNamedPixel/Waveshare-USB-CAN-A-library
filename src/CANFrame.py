@@ -47,4 +47,4 @@ class CANFrame:
         return self._is_extended
 
     def __repr__(self) -> str:
-        return f"CANFrame(can_id={self.can_id}, can_data={self.can_data}, is_extended={self._is_extended}, is_rtr={self.is_rtr})"
+        return f"CANFrame(can_id={self.can_id}, can_data={self.can_data.hex()}, is_extended={self._is_extended}, is_rtr={self.is_rtr})"
