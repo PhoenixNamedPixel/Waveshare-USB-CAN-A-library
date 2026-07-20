@@ -74,7 +74,7 @@ class WaveshareCan:
         # data for CAN bus configurations
         self.type = Type.VARIABLE
         self.can_speed = can_speed
-        self.send_type = CanFrameFormat.STANDARD
+        self.filter_frame_type = CanFrameFormat.STANDARD
         self.mode = CanMode.NORMAL
         self.auto_retransmit = AutoRetransmit.ENABLED
 
@@ -204,7 +204,7 @@ class WaveshareCan:
             0x55,  # Message footer
             self.type.value,  # Fixed vs Variable length
             self.can_speed.value,  # Speed of CAN bus
-            self.send_type.value,  # Standard vs Extended frame
+            self.filter_frame_type.value,  # Standard vs Extended frame
             0x00,
             0x00,
             0x00,
@@ -248,12 +248,12 @@ class WaveshareCan:
         payload += bytes([0x55])
         return payload
 
-    def update_configurations(self, communication_type: Optional[Type] = None, can_speed: Optional[CanSpeed] = None, frame_type: Optional[CanFrameFormat] = None, can_mode: Optional[CanMode] = None, auto_retransmit: Optional[AutoRetransmit] = None) -> None:
+    def update_configurations(self, communication_type: Optional[Type] = None, can_speed: Optional[CanSpeed] = None, filter_frame_type: Optional[CanFrameFormat] = None, can_mode: Optional[CanMode] = None, auto_retransmit: Optional[AutoRetransmit] = None) -> None:
         """Updates the configurations sent to the Waveshare adapter, add only the settings you want to change, the others will remain the same.
         Args:
             communication_type: The communication type of the configurations sent to the Waveshare adapter, either fixed or variable data length. Use the Type class.
             can_speed: The speed of the can bus. Use the CanSpeed class.
-            frame_type: Which type of frame to use, standard to extended. Use the CanFrameFormat class.
+            filter_frame_type: Whether to filter for just extended frames or to receive all frames (standard). Use the CanFrameFormat class.
             can_mode: The communication mode of the adapter, normal, silent, loopback, and loopback silent. Use the CanMode class.
             auto_retransmit: Automatically retransmit the can frame if failed. Use the AutoRetransmit class."""
         is_changed = False
@@ -263,8 +263,8 @@ class WaveshareCan:
         if can_speed is not None:
             self.can_speed = can_speed
             is_changed = True
-        if frame_type is not None:
-            self.send_type = frame_type
+        if filter_frame_type is not None:
+            self.filter_frame_type = filter_frame_type
             is_changed = True
         if can_mode is not None:
             self.mode = can_mode
