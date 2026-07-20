@@ -140,13 +140,11 @@ class WaveshareCan:
             raise ReadException('Port not open')
 
         try:
-            """
-            This loops until it finds the header byte plus a byte with the first two bits being 1 (C0).
-            It will then raise a ReadException if the end byte is not footer (55).
-            There can be a rare case where data is aligned so perfectly that there is a AA C0 ... 55 marking a packet when
-            there is not one. The library might read this ghost packet accidentally in an extreme edge case and nothing
-            can be done to stop this unfortunately
-            """
+            """This loops until it finds the header byte plus a byte with the first two bits being 1 (C0). It will 
+            then raise a ReadException if the end byte is not footer (55). There can be a rare case where data is 
+            aligned so perfectly that there is a AA C0 ... 55 marking a packet when there is not one. The library 
+            might read this ghost packet accidentally in an extreme edge case and the Waveshare adapter does not 
+            provide any error checking in the byte stream so this is a hardware limitation"""
             while True:
                 header = self.serial.read(1)[0]
                 if header == 0xAA:
