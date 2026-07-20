@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 
-from CANFrame import CANFrame
+from src.CANFrame import CANFrame
 
 import serial
 
@@ -58,7 +58,7 @@ class PortException(Exception):
 class WaveshareCan:
     """A class to interact with a Waveshare USB CAN A"""
 
-    def __init__(self, port: Optional[str], can_speed: CanSpeed = CanSpeed.SPEED_250kbps, baudrate: int = 2000000) -> None:
+    def __init__(self, port: Optional[str] = None, can_speed: CanSpeed = CanSpeed.SPEED_250kbps, baudrate: int = 2000000) -> None:
         """
         Initialize the Waveshare USB CAN A library
 
@@ -193,6 +193,9 @@ class WaveshareCan:
         """Sends the configurations to the Waveshare adapter"""
         configurations = self._prepare_config_payload()
         self._write(configurations)
+        # resets the connection, needed for changes to take effect
+        self.close_port()
+        self.open_port()
 
     def _prepare_config_payload(self) -> bytes:
         """Prepares the configuration payload for the Waveshare adapter
