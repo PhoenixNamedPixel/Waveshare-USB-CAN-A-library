@@ -5,16 +5,16 @@ class TestAdapter:
     """Unit tests for hte underlying logic in adapter.py"""
     def test_control_byte_parsing_valid_lower(self):
         control = 0xC0
-        assert WaveshareCan()._parse_control_byte(control) == (3, False, False)
+        assert WaveshareCan()._parse_control_byte(control) == (3, False, False, 0)
 
     def test_control_byte_parsing_valid_upper(self):
         control = 0xC8
-        assert WaveshareCan()._parse_control_byte(control) == (11, False, False)
+        assert WaveshareCan()._parse_control_byte(control) == (11, False, False, 8)
 
     def test_control_byte_parsing_extended_lower(self):
         control = 0xE0
-        assert WaveshareCan()._parse_control_byte(control) == (5, True, False)
+        assert WaveshareCan()._parse_control_byte(control) == (5, True, False, 0)
 
     def test_control_byte_parsing_extended_upper(self):
         control = 0xE8
-        assert WaveshareCan()._parse_control_byte(control) == (13, True, False)
+        assert WaveshareCan()._parse_control_byte(control) == (13, True, False, 8)

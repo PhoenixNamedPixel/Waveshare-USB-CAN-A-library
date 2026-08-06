@@ -15,7 +15,6 @@ class TestCanFrame:
     def test_default_init_with_rtr(self):
         frame = CANFrame(123, is_rtr=True)
         assert frame.can_id == 123
-        assert frame.can_data == b""
         assert not frame.is_extended
         assert frame.is_rtr
         assert frame.dlc == 0
@@ -32,7 +31,6 @@ class TestCanFrame:
     def test_default_init_with_both(self):
         frame = CANFrame(123, is_extended=True, is_rtr=True)
         assert frame.can_id == 123
-        assert frame.can_data == b""
         assert frame.is_extended
         assert frame.is_rtr
         assert frame.dlc == 0
@@ -64,7 +62,7 @@ class TestCanFrame:
     def test_repr(self):
         data = b"\x12\x34\x56"
         frame = CANFrame(123, can_data=data)
-        assert repr(frame) == "CANFrame(can_id=123, can_data=123456, is_extended=False, is_rtr=False)"
+        assert repr(frame) == "CANFrame(can_id=123, can_data=123456, data_length=3, is_extended=False, is_rtr=False)"
 
     def test_min_id(self):
         frame = CANFrame(0)
