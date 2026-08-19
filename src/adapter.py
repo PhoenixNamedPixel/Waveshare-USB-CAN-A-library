@@ -72,7 +72,7 @@ class WaveshareCan:
             """
 
         # data for CAN bus configurations
-        self.type = Type.VARIABLE
+        self.type = Type.FIXED
         self.can_speed = can_speed
         self.filter_frame_type = CanFrameFormat.STANDARD
         self.mode = CanMode.NORMAL
@@ -139,32 +139,57 @@ class WaveshareCan:
         if not self.serial.is_open:
             raise ReadException('Port not open')
 
-        try:
-            """This loops until it finds the header byte plus a byte with the first two bits being 1 (C0). It will 
-            then raise a ReadException if the end byte is not footer (55). There can be a rare case where data is 
-            aligned so perfectly that there is a AA C0 ... 55 marking a packet when there is not one. The library 
-            might read this ghost packet accidentally in an extreme edge case and the Waveshare adapter does not 
-            provide any error checking in the byte stream so this is a hardware limitation"""
+        if self.type == Type.VARIABLE:
+            try:
+                """This loops until it finds the header byte plus a byte with the first two bits being 1 (C0). It will 
+                then raise a ReadException if the end byte is not footer (55). There can be a rare case where data is 
+                aligned so perfectly that there is a AA C0 ... 55 marking a packet when there is not one. The library 
+                might read this ghost packet accidentally in an extreme edge case and the Waveshare adapter does not 
+                provide any error checking in the byte stream so this is a hardware limitation"""
+                while True:
+                    header = self.serial.read(1)[0]
+                    if header == 0xAA:
+                        control = self.serial.read(1)[0]
+                        if control & 0xC0 == 0xC0:
+                            frame_length, is_extended, is_rtr, data_length = self._parse_control_byte(control)
+
+                            # Get the rest of the data
+                            payload = self.serial.read(frame_length)
+
+                            # is_extended and is_rtr are needed to work out the exact frame length for reading the payload
+                            return self._parse_frame(payload, is_extended, is_rtr, data_length)
+                        else:
+                            print("Control byte not found")
+                    else:
+                        print("header not read")
+
+
+            except serial.SerialException as e:
+                raise ReadException(f'Could not read data: {e}')
+
+        else:
             while True:
                 header = self.serial.read(1)[0]
                 if header == 0xAA:
-                    control = self.serial.read(1)[0]
-                    if control & 0xC0 == 0xC0:
-                        frame_length, is_extended, is_rtr, data_length = self._parse_control_byte(control)
+                    header2 = self.serial.read(1)[0]
+                    if header2 == 0x55:
+                        payload = self.serial.read(18)
+                        print(payload.hex())
+                        states = payload[0:3] # type, framework type, framework format
+                        id_bytes = payload[3:7] # little endian
+                        length = payload[7]
+                        data = payload[8:(9+length)] # big endian
+                        checksum = payload[17]
+                        if self._calculate_checksum(payload[:-1]) != checksum:
+                            raise ReadException('Checksum error, message received incorrectly')
 
-                        # Get the rest of the data
-                        payload = self.serial.read(frame_length)
+                        is_extended = True if states[1] == 0x02 else False
+                        is_rtr = True if states[2] == 0x02 else False
 
-                        # is_extended and is_rtr are needed to work out the exact frame length for reading the payload
-                        return self._parse_frame(payload, is_extended, is_rtr, data_length)
-                    else:
-                        print("Control byte not found")
-                else:
-                    print("header not read")
+                        id_number = int.from_bytes(id_bytes if is_extended else id_bytes[0:2], 'little')
 
+                        return CANFrame(id_number, data, is_extended, is_rtr, length)
 
-        except serial.SerialException as e:
-            raise ReadException(f'Could not read data: {e}')
 
     @staticmethod
     def _parse_control_byte(control) -> tuple[int, bool, bool, int]:
@@ -205,8 +230,6 @@ class WaveshareCan:
         """Prepares the configuration payload for the Waveshare adapter
         **Note:** this is automatically used within send_configurations"""
         configurations = bytes([
-            0xAA,  # Message header
-            0x55,  # Message footer
             self.type.value,  # Fixed vs Variable length
             self.can_speed.value,  # Speed of CAN bus
             self.filter_frame_type.value,  # Standard vs Extended frame
@@ -227,6 +250,10 @@ class WaveshareCan:
         ])
 
         configurations += bytes([self._calculate_checksum(configurations)])
+        configurations = bytes([
+            0xAA,  # Message header
+            0x55,
+        ]) + configurations
         return configurations
 
     def send_frame(self, frame: CANFrame) -> None:
@@ -282,7 +309,7 @@ class WaveshareCan:
 
     @staticmethod
     def _calculate_checksum(data: bytes) -> int:
-        return sum(data[2:]) & 0xFF
+        return sum(data) & 0xFF
 
     def _read(self):
         while True:
@@ -295,8 +322,9 @@ class WaveshareCan:
 
 if __name__ == '__main__':
     device = WaveshareCan('COM6')
-    frame = CANFrame(321, is_rtr=True, dlc=5)
+    #frame = CANFrame(321, is_rtr=True, dlc=5)
     while True:
-        device.send_frame(frame)
-        print("Frame sent")
+        # device.send_frame(frame)
+        # print("Frame sent")
+        # print(device.read_frame())
         print(device.read_frame())
