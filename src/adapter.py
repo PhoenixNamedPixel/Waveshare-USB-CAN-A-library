@@ -261,24 +261,37 @@ class WaveshareCan:
         Args:
             frame: The CANFrame object to be sent to the Waveshare adapter"""
         payload = self._prepare_frame(frame)
+        print(payload.hex())
         self._write(payload)
 
-    @staticmethod
-    def _prepare_frame(frame: CANFrame) -> bytes:
+    def _prepare_frame(self, frame: CANFrame) -> bytes:
         """Turns the CAN frame from a CANFrame object to the bytes needed to send to the adapter.
 
         **Note:** this is automatically used within send_frame
         Args:
             frame: The CAN frame that needs to be turned into bytes
         """
-        payload = bytes([
-            0xAA,
-            0xC0 | (0x20 if frame.is_extended else 0x00) | (0x10 if frame.is_rtr else 0x00) | frame.dlc,
-        ])
-        payload += frame.can_id.to_bytes(4 if frame.is_extended else 2, byteorder='little')
-        payload += frame.can_data if not frame.is_rtr else bytes(frame.dlc) # Must pad otherwise the transmission stalls
-        payload += bytes([0x55])
-        return payload
+        if self.type == Type.VARIABLE:
+            payload = bytes([
+                0xAA,
+                0xC0 | (0x20 if frame.is_extended else 0x00) | (0x10 if frame.is_rtr else 0x00) | frame.dlc,
+            ])
+            payload += frame.can_id.to_bytes(4 if frame.is_extended else 2, byteorder='little')
+            payload += frame.can_data if not frame.is_rtr else bytes(frame.dlc) # Must pad otherwise the transmission stalls
+            payload += bytes([0x55])
+            return payload
+        else:
+            header = bytes([0xAA, 0x55,])
+            states = bytes([0x01,0x02 if frame.is_extended else 0x01, 0x02 if frame.is_rtr else 0x01,])
+            id_bytes = frame.can_id.to_bytes(4, byteorder='little') if frame.is_extended else frame.can_id.to_bytes(2, byteorder='little') + bytes(2)
+            length = frame.dlc.to_bytes()
+            data = frame.can_data + bytes(8-frame.dlc) if not frame.is_rtr else bytes(8)
+            reserve = bytes([0x00,])
+            payload = states + id_bytes + length + data + reserve
+            checksum = self._calculate_checksum(payload).to_bytes()
+            return header + payload + checksum
+
+
 
     def update_configurations(self, communication_type: Optional[Type] = None, can_speed: Optional[CanSpeed] = None, filter_frame_type: Optional[CanFrameFormat] = None, can_mode: Optional[CanMode] = None, auto_retransmit: Optional[AutoRetransmit] = None) -> None:
         """Updates the configurations sent to the Waveshare adapter, add only the settings you want to change, the others will remain the same.
@@ -322,9 +335,8 @@ class WaveshareCan:
 
 if __name__ == '__main__':
     device = WaveshareCan('COM6')
-    #frame = CANFrame(321, is_rtr=True, dlc=5)
+    frame = CANFrame(321, is_rtr=True, dlc=5)
     while True:
-        # device.send_frame(frame)
-        # print("Frame sent")
-        # print(device.read_frame())
+        device.send_frame(frame)
+        print("Frame sent")
         print(device.read_frame())
