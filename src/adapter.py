@@ -1,4 +1,5 @@
 from enum import Enum
+from time import sleep
 from typing import Optional
 
 from src.CANFrame import CANFrame
@@ -174,7 +175,6 @@ class WaveshareCan:
                     header2 = self.serial.read(1)[0]
                     if header2 == 0x55:
                         payload = self.serial.read(18)
-                        print(payload.hex())
                         states = payload[0:3] # type, framework type, framework format
                         id_bytes = payload[3:7] # little endian
                         length = payload[7]
@@ -222,7 +222,8 @@ class WaveshareCan:
         """Sends the configurations to the Waveshare adapter"""
         configurations = self._prepare_config_payload()
         self._write(configurations)
-        # resets the connection, needed for changes to take effect
+        self.serial.flush() # forces all bytes to be sent
+        sleep(0.05) # gives the controller time to make the changes
         self.close_port()
         self.open_port()
 
@@ -261,7 +262,6 @@ class WaveshareCan:
         Args:
             frame: The CANFrame object to be sent to the Waveshare adapter"""
         payload = self._prepare_frame(frame)
-        print(payload.hex())
         self._write(payload)
 
     def _prepare_frame(self, frame: CANFrame) -> bytes:
@@ -332,11 +332,3 @@ class WaveshareCan:
                 break
             else:
                 print(byte.to_bytes(1).hex(), " ", end='')
-
-if __name__ == '__main__':
-    device = WaveshareCan('COM6')
-    frame = CANFrame(321, is_rtr=True, dlc=5)
-    while True:
-        device.send_frame(frame)
-        print("Frame sent")
-        print(device.read_frame())
