@@ -178,7 +178,7 @@ class WaveshareCan:
                         states = payload[0:3] # type, framework type, framework format
                         id_bytes = payload[3:7] # little endian
                         length = payload[7]
-                        data = payload[8:(9+length)] # big endian
+                        data = payload[8:(8+length)] # big endian
                         checksum = payload[17]
                         if self._calculate_checksum(payload[:-1]) != checksum:
                             raise ReadException('Checksum error, message received incorrectly')
