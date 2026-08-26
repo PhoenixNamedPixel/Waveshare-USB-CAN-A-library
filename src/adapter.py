@@ -98,15 +98,14 @@ class WaveshareCan:
         """Opens the serial port if closed"""
         if self.serial is None:
             raise PortException("The port has not been declared")
-        try:
-            if not self.serial.is_open:
+        if not self.serial.is_open:
+            try:
                 self.serial.open()
-                print("Port opened")
-            else:
-                print("Port already open")
-        except serial.SerialException as e:
-            print('Could not open serial port')
-            print(e)
+            except serial.SerialException as e:
+                raise PortException(f"Failed to open the port: {e}") from e
+        else:
+            raise PortException("Port already open")
+
 
     def close_port(self) -> None:
         """Closes the serial port if open"""
@@ -114,9 +113,8 @@ class WaveshareCan:
             raise PortException("The port has not been declared")
         if self.serial.is_open:
             self.serial.close()
-            print("Port closed")
         else:
-            print("Port not open")
+            raise PortException("Port not open")
 
     def _write(self, data: bytes) -> None:
         """Writes the bytes to the serial port"""
@@ -160,13 +158,13 @@ class WaveshareCan:
                             # is_extended and is_rtr are needed to work out the exact frame length for reading the payload
                             return self._parse_frame(payload, is_extended, is_rtr, data_length)
                         else:
-                            print("Control byte not found")
+                            raise ReadException("Control byte not found")
                     else:
-                        print("header not read")
+                        raise ReadException("header not read")
 
 
             except serial.SerialException as e:
-                raise ReadException(f'Could not read data: {e}')
+                raise ReadException(f'Could not read data: {e}') from e
 
         else:
             while True:
