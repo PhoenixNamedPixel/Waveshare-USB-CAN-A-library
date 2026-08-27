@@ -90,5 +90,29 @@ Automatically retransmit the can frame if failed, use ```auto_retransmit``` para
 | ENABLED* |
 | DISABLED |
 
+## Baudrate
+If there seems to be no communication between the adapter and the library, please check if the baudrate is different. 
+
+To do this, turn the adapter off and on again, count the blinks on the TX/RX LEDs and compare to the table
+
+| Flash count | Baudrate |
+|-------------|----------|
+| 1           | 2000000  |
+| 2           | 1228800  |
+| 3           | 115200   |
+| 4           | 38400    |
+| 5           | 19200    |
+| 6           | 9600     |
+
+If it is more than 1 blink, either reset the adapter with the onboard reset button (hold and then turn on) or use the 
+config tool from [WaveShare](https://www.waveshare.com/wiki/USB-CAN-A). 
+
+If you really want to use that baudrate you can use the baudrate parameter when creating the object. e.g. 
+```python 
+from src import *
+
+adapter = WaveshareCan("COM6", baudrate=2000000) # replace the 2000000 with your required baudrate
+```
+
 ## License
 Copyright © 2026 Mathew Merry. Distributed under the MIT License. See the LICENSE file for details.

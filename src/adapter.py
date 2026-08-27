@@ -91,7 +91,10 @@ class WaveshareCan:
         Args:
             port: the serial port to connect"""
         self.port = port
-        self.serial = serial.Serial(self.port, self.baudrate)
+        try:
+            self.serial = serial.Serial(self.port, self.baudrate)
+        except serial.SerialException as e:
+            raise PortException(f"Failed to open the port: {e}") from e
         self.send_configurations()
 
     def open_port(self) -> None:
